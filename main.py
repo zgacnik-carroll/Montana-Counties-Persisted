@@ -1,16 +1,19 @@
-# This is a sample Python script.
+import csv
 
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+def load_county_data(filename):
+    """
+    Loads county data from CSV into a dictionary.
 
+    Returns:
+        dict: license_prefix -> (county_name, county_seat)
+    """
+    counties = {}
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
+    with open(filename, newline="", encoding="utf-8") as file:
+        reader = csv.DictReader(file)
 
+        for row in reader:
+            prefix = int(row["License Plate Prefix"])
+            counties[prefix] = (row["County"], row["County Seat"])
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+    return counties
