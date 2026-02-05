@@ -1,54 +1,135 @@
+"""
+main.py
+
+Author: Zack Gacnik
+Description:
+    This program allows users to look up Montana counties using
+    license plate prefixes or city names. County data is loaded
+    from a CSV file, while user-added city mappings are stored
+    persistently in a text file.
+
+    Features:
+    - Lookup county and county seat by license plate prefix.
+    - Lookup license plate prefix by city name.
+    - Persistently store new city entries for future use.
+    - Basic input validation and error handling.
+
+Requirements:
+    Python 3.13
+"""
+
 import csv
 
 def load_county_data(filename):
     """
-    Loads county data from CSV into a dictionary.
+    Load county data from a CSV file into a dictionary.
+
+    The CSV file must contain the following columns:
+        - License Plate Prefix
+        - County
+        - County Seat
+
+    Args:
+        filename (str): Path to the CSV file containing county data.
 
     Returns:
-        dict: license_prefix -> (county_name, county_seat)
+        dict[int, tuple[str, str]]:
+            A dictionary mapping license plate prefixes to a tuple
+            containing (county_name, county_seat).
     """
     counties = {}
 
+    # Open CSV file and read rows as dictionaries.
     with open(filename, newline="", encoding="utf-8") as file:
         reader = csv.DictReader(file)
 
         for row in reader:
+            # Convert prefix to integer for faster lookup and validation.
             prefix = int(row["License Plate Prefix"])
+
+            # Store county information as a tuple.
             counties[prefix] = (row["County"], row["County Seat"])
 
     return counties
 
 def load_city_data(filename):
     """
-    Loads known cities from a text file.
+    Load known city-to-prefix mappings from a text file.
+
+    Each line in the file must follow this format:
+        city_name,prefix
+
+    City names are stored in lowercase to allow
+    case-insensitive lookups.
+
+    Args:
+        filename (str): Path to the city data file.
 
     Returns:
-        dict: city_name(lowercase) -> license_prefix
+        dict[str, int]:
+            Dictionary mapping city names (lowercase)
+            to license plate prefixes.
     """
     cities = {}
 
     try:
         with open(filename, "r", encoding="utf-8") as file:
             for line in file:
-                city, prefix = line.strip().split(",")
-                cities[city.lower()] = int(prefix)
+                # Remove whitespace and newline characters.
+                line = line.strip()
+
+                # Skip empty lines to avoid parsing errors.
+                if not line:
+                    continue
+
+                try:
+                    # Split line into city and prefix.
+                    city, prefix = line.split(",")
+
+                    # Store using lowercase keys for consistency.
+                    cities[city.lower()] = int(prefix)
+
+                except ValueError:
+                    # Ignore malformed lines instead of crashing.
+                    continue
+
     except FileNotFoundError:
-        # File will be created later if it does not exist
+        # File may not exist on first run; this is acceptable.
         pass
 
     return cities
 
 def add_city_to_store(filename, city, prefix):
     """
-    Appends a new city to the persistent data store.
+    Append a new city and prefix mapping to the data file.
+
+    This allows newly added cities to persist between program runs.
+
+    Args:
+        filename (str): Path to the city data file.
+        city (str): Name of the city.
+        prefix (int): Associated license plate prefix.
     """
     with open(filename, "a", encoding="utf-8") as file:
         file.write(f"{city},{prefix}\n")
 
 def license_lookup(counties):
-    """Lookup county by license plate prefix."""
-    prefix = int(input("Enter license plate prefix: "))
+    """
+    Perform a lookup using a license plate prefix.
 
+    Prompts the user for a numeric prefix and displays
+    the associated county and county seat if found.
+
+    Args:
+        counties (dict): Mapping of prefixes to county data.
+    """
+    try:
+        prefix = int(input("Enter license plate prefix: "))
+    except ValueError:
+        print("Please enter a valid number.")
+        return
+
+    # Check whether the prefix exists in the dataset.
     if prefix in counties:
         county, seat = counties[prefix]
         print(f"County: {county}")
@@ -57,27 +138,61 @@ def license_lookup(counties):
         print("Unknown license plate prefix.")
 
 def city_lookup(cities, counties, city_file):
-    """Lookup license prefix by city name."""
+    """
+    Perform a lookup using a city name.
+
+    If the city exists, the associated county and prefix
+    are displayed. If not, the user is prompted to add the
+    city to the persistent data store.
+
+    Args:
+        cities (dict): City-to-prefix mapping.
+        counties (dict): Prefix-to-county mapping.
+        city_file (str): Path to persistent city storage file.
+    """
     city = input("Enter city name: ").lower()
 
+    # Prevent empty input.
+    if not city:
+        print("City name cannot be empty.")
+        return
+
+    # Existing city lookup.
     if city in cities:
         prefix = cities[city]
         county, _ = counties[prefix]
         print(f"County: {county}")
         print(f"License Prefix: {prefix}")
-    else:
-        print("City not found.")
+        return
+
+    print("City not found.")
+
+    # Allow user to add new mapping.
+    try:
         prefix = int(input("Enter license prefix for this city: "))
+    except ValueError:
+        print("Invalid prefix.")
+        return
 
-        # Store persistently
-        add_city_to_store(city_file, city, prefix)
+    # Validate that prefix exists in county data.
+    if prefix not in counties:
+        print("That license prefix does not exist.")
+        return
 
-        # Update in-memory dictionary
-        cities[city] = prefix
+    # Persist new entry and update in-memory dictionary.
+    add_city_to_store(city_file, city, prefix)
+    cities[city] = prefix
 
-        print("City added for future lookups.")
+    print("City added for future lookups.")
+
 
 def main():
+    """
+    Main program loop.
+
+    Loads required data files and repeatedly prompts the
+    user for an action until the user chooses to quit.
+    """
     counties = load_county_data("MontanaCounties.csv")
     cities = load_city_data("cities.txt")
 
@@ -96,11 +211,13 @@ def main():
             city_lookup(cities, counties, "cities.txt")
 
         elif choice == "3":
-            print("Goodbye!")
+            print("Thanks for playing. Goodbye!")
             break
 
         else:
             print("Invalid choice.")
 
+# Standard Python entry point check.
+# Ensures main() only runs when the file is executed directly.
 if __name__ == "__main__":
     main()
