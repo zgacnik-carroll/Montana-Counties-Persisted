@@ -99,6 +99,21 @@ def load_city_data(filename):
 
     return cities
 
+def populate_county_seats(cities, counties):
+    """
+    Add county seats to the city lookup dictionary.
+
+    This allows county seats from the CSV file to be recognized
+    automatically as valid city inputs without requiring them
+    to be stored in the persistent city file.
+    """
+    for prefix, (_, seat) in counties.items():
+        seat_lower = seat.lower()
+
+        # Do not overwrite user-added entries.
+        if seat_lower not in cities:
+            cities[seat_lower] = prefix
+
 def add_city_to_store(filename, city, prefix):
     """
     Append a new city and prefix mapping to the data file.
@@ -123,19 +138,29 @@ def license_lookup(counties):
     Args:
         counties (dict): Mapping of prefixes to county data.
     """
-    try:
-        prefix = int(input("Enter license plate prefix: "))
-    except ValueError:
-        print("Please enter a valid number.")
-        return
 
-    # Check whether the prefix exists in the dataset.
-    if prefix in counties:
-        county, seat = counties[prefix]
-        print(f"County: {county}")
-        print(f"County Seat: {seat}")
-    else:
-        print("Unknown license plate prefix.")
+    # Loop allows user to retry without returning to main menu.
+    while True:
+        user_input = input(
+            "\nEnter license plate prefix (or 'q' to return): "
+        )
+
+        if user_input.lower() == "q":
+            return
+
+        try:
+            prefix = int(user_input)
+        except ValueError:
+            print("Please enter a valid number.")
+            continue
+
+        # Check whether the prefix exists in the dataset.
+        if prefix in counties:
+            county, seat = counties[prefix]
+            print(f"County: {county}")
+            print(f"County Seat: {seat}")
+        else:
+            print("Unknown license plate prefix.")
 
 def city_lookup(cities, counties, city_file):
     """
@@ -150,41 +175,53 @@ def city_lookup(cities, counties, city_file):
         counties (dict): Prefix-to-county mapping.
         city_file (str): Path to persistent city storage file.
     """
-    city = input("Enter city name: ").lower()
 
-    # Prevent empty input.
-    if not city:
-        print("City name cannot be empty.")
-        return
+    # Loop allows user to retry without returning to main menu.
+    while True:
+        city = input(
+            "\nEnter city name (or 'q' to return): "
+        ).lower()
 
-    # Existing city lookup.
-    if city in cities:
-        prefix = cities[city]
-        county, _ = counties[prefix]
-        print(f"County: {county}")
-        print(f"License Prefix: {prefix}")
-        return
+        # Prevent empty input.
+        if city == "q":
+            return
 
-    print("City not found.")
+        if not city:
+            print("City name cannot be empty.")
+            continue
 
-    # Allow user to add new mapping.
-    try:
-        prefix = int(input("Enter license prefix for this city: "))
-    except ValueError:
-        print("Invalid prefix.")
-        return
+        # Existing city lookup.
+        if city in cities:
+            prefix = cities[city]
+            county, _ = counties[prefix]
+            print(f"County: {county}")
+            print(f"License Prefix: {prefix}")
+            continue
 
-    # Validate that prefix exists in county data.
-    if prefix not in counties:
-        print("That license prefix does not exist.")
-        return
+        print("City not found.")
 
-    # Persist new entry and update in-memory dictionary.
-    add_city_to_store(city_file, city, prefix)
-    cities[city] = prefix
+        # Allow user to add new mapping.
+        try:
+            prefix = int(
+                input("Enter license prefix for this city (or -1 to cancel): ")
+            )
+        except ValueError:
+            print("Invalid prefix.")
+            continue
 
-    print("City added for future lookups.")
+        if prefix == -1:
+            continue
 
+        # Validate that prefix exists in county data.
+        if prefix not in counties:
+            print("That license prefix does not exist.")
+            continue
+
+        # Persist new entry and update in-memory dictionary.
+        add_city_to_store(city_file, city, prefix)
+        cities[city] = prefix
+
+        print("City added for future lookups.")
 
 def main():
     """
@@ -195,6 +232,9 @@ def main():
     """
     counties = load_county_data("MontanaCounties.csv")
     cities = load_city_data("cities.txt")
+
+    # Automatically add county seats as valid city entries.
+    populate_county_seats(cities, counties)
 
     while True:
         print("\nSelect an option:")
